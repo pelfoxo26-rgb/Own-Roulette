@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Drehrad Roulette - Stylish</title>
+<style>
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    background: linear-gradient(to right, #f0f4f7, #d9e2ec);
+}
+
+#highlightContainer {
+    width: 400px;
+    min-height: 60px;
+    background-color: #fff176;
+    border-radius: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 22px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    padding: 10px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transition: transform 0.2s;
+}
+
+#highlightContainer.pop {
+    transform: scale(1.1);
+}
+
+button {
+    padding: 10px 20px;
+    font-size: 16px;
+    margin: 5px;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+#spinButton { background: linear-gradient(to right, #43cea2, #185a9d); }
+#doneButton { background: linear-gradient(to right, #56ab2f, #a8e063); }
+#failedButton { background: linear-gradient(to right, #f12711, #f5af19); }
+#editorButton { background: linear-gradient(to right, #6a11cb, #2575fc); }
+
+#rouletteContainer {
+    position: relative;
+    width: 400px;
+    height: 400px;
+    margin-bottom: 20px;
+}
+
+canvas {
+    border-radius: 50%;
+    background-color: #fff;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+}
+
+#pointer {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; 
+    height: 0; 
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-bottom: 30px solid #e53935;
+    z-index: 10;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+}
+
+#statusContainer {
+    display: none;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 10px;
+}
+
+#totalPoints {
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 10px;
+    color: #333;
+}
+
+#failedList {
+    margin-top: 5px;
+    color: #d32f2f;
+    font-weight: bold;
+    max-width: 420px;
+    word-wrap: break-word;
+}
+
+#editorOverlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    justify-content: center;
+    align-items: center;
+    z-index: 100;
+}
+
+#editorWindow {
+    background-color: #fff;
+    padding: 20px;
+    border-radius: 15px;
+    width: 400px;
+    max-height: 80%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.editorItem {
+    display: flex;
+    margin-bottom: 5px;
+    gap: 5px;
+}
+
+.editorItem input[type="text"] { flex: 1; padding: 5px; border-radius: 5px; border: 1px solid #ccc; }
+.editorItem button { background-color: #e74c3c; color: white; padding: 5px; border-radius: 5px; border: none; cursor: pointer; }
+.editorItem button:hover { background-color: #c0392b; }
+
+#closeEditor { align-self: flex-end; background-color: #3498db; }
+#closeEditor:hover { background-color: #2980b9; }
+
+#addAction { background-color: #1abc9c; color: white; padding: 10px; border: none; border-radius: 10px; margin-top: 10px; cursor: pointer; }
+#addAction:hover { background-color: #16a085; }
+</style>
+</head>
+<body>
+
+<div id="highlightContainer">Hier wird die ausgewählte Handlung angezeigt</div>
+
+<div id="rouletteContainer">
+    <div id="pointer"></div>
+    <canvas id="rouletteCanvas" width="400" height="400"></canvas>
+</div>
+
+<button id="spinButton">Drehen</button>
+
+<div id="statusContainer">
+    <button id="doneButton">Geschafft</button>
+    <button id="failedButton">Fehlgeschlagen</button>
+    <button id="editorButton">Editor</button>
+</div>
+
+<div id="totalPoints">Gesamtpunkte: 0</div>
+<div id="failedList"></div>
+
+<div id="editorOverlay">
+    <div id="editorWindow">
+        <button id="closeEditor">Schließen</button>
+        <h3>Handlungen bearbeiten:</h3>
+        <div id="editorContent"></div>
+        <button id="addAction">Neue Handlung hinzufügen</button>
+    </div>
+</div>
+
+<script>
+let actions = [
+    {text: "Gehe spazieren", points: 5, status:""},
+    {text: "Lies ein Buch", points: 10, status:""},
+    {text: "Schreibe ein Tagebuch", points: 8, status:""},
+    {text: "Koche etwas Leckeres", points: 7, status:""},
+    {text: "Höre Musik", points: 3, status:""},
+    {text: "Mache Sport", points: 12, status:""},
+    {text: "Meditieren", points: 6, status:""},
+    {text: "Räume dein Zimmer auf", points: 4, status:""},
+    {text: "Male oder zeichne", points: 9, status:""},
+    {text: "Rufe einen Freund an", points: 5, status:""},
+    {text: "Löse ein Rätsel", points: 7, status:""},
+    {text: "Schreibe eine E-Mail", points: 3, status:""},
+    {text: "Trinke ein Glas Wasser", points: 1, status:""},
+    {text: "Plane deinen Tag", points: 6, status:""},
+    {text: "Backe einen Kuchen", points: 10, status:""}
+];
+
+const colors = ["#f28b82","#fbbc04","#fff475","#ccff90","#a7ffeb","#cbf0f8","#aecbfa","#d7aefb","#fdcfe8","#e6c9a8"];
+const canvas = document.getElementById("rouletteCanvas");
+const ctx = canvas.getContext("2d");
+const centerX = canvas.width/2;
+const centerY = canvas.height/2;
+const radius = canvas.width/2 - 20;
+const highlightContainer = document.getElementById("highlightContainer");
+const spinButton = document.getElementById("spinButton");
+const statusContainer = document.getElementById("statusContainer");
+const doneButton = document.getElementById("doneButton");
+const failedButton = document.getElementById("failedButton");
+const editorButton = document.getElementById("editorButton");
+const totalPointsDiv = document.getElementById("totalPoints");
+const failedListDiv = document.getElementById("failedList");
+
+const editorOverlay = document.getElementById("editorOverlay");
+const editorContent = document.getElementById("editorContent");
+const closeEditor = document.getElementById("closeEditor");
+const addActionBtn = document.getElementById("addAction");
+
+let currentAngle = 0;
+let selectedActionIndex = null;
+
+function calculateTotalPoints() {
+    const total = actions.reduce((sum,a)=>a.status==="geschafft"?sum+a.points:sum,0);
+    totalPointsDiv.textContent = `Gesamtpunkte: ${total}`;
+    const failed = actions.filter(a=>a.status==="fehlgeschlagen").map(a=>a.text);
+    failedListDiv.textContent = failed.length>0 ? "Fehlgeschlagen: "+failed.join(", ") : "";
+}
+
+function drawRoulette() {
+    const numActions = actions.length;
+    const sliceAngle = 2*Math.PI/numActions;
+    for(let i=0;i<numActions;i++){
+        ctx.beginPath();
+        ctx.moveTo(centerX,centerY);
+        ctx.arc(centerX,centerY,radius,currentAngle + i*sliceAngle,currentAngle + (i+1)*sliceAngle);
+        ctx.fillStyle = colors[i%colors.length];
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(centerX,centerY);
+        ctx.rotate(currentAngle + (i+0.5)*sliceAngle);
+        ctx.textAlign="center";
+        ctx.fillStyle="#333";
+        ctx.font="bold 14px Arial";
+        ctx.fillText(actions[i].text, radius/2,5);
+        ctx.restore();
+    }
+}
+
+function getActionUnderPointer() {
+    const numActions = actions.length;
+    const sliceAngle = 2*Math.PI/numActions;
+    let angle = (3/2*Math.PI - currentAngle) % (2*Math.PI);
+    if(angle < 0) angle += 2*Math.PI;
+    const index = Math.floor(angle / sliceAngle);
+    return index;
+}
+
+function spinWheel(){
+    spinButton.disabled = true;
+    let spins = Math.random()*3 + 4;
+    const sliceAngle = 2*Math.PI/actions.length;
+    let targetIndex = Math.floor(Math.random()*actions.length);
+    selectedActionIndex = targetIndex;
+    let targetAngle = (3/2)*Math.PI - (targetIndex+0.5)*sliceAngle;
+
+    let start = null;
+    function animate(timestamp){
+        if(!start) start = timestamp;
+        const progress = (timestamp-start)/3000;
+        const eased = 1-Math.pow(1-progress,3);
+        currentAngle = eased*spins*2*Math.PI + targetAngle;
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        drawRoulette();
+
+        const index = getActionUnderPointer();
+        highlightContainer.textContent = `${actions[index].text} (${actions[index].points} P)` + (actions[index].status?` [${actions[index].status}]`:"");
+
+        if(progress<1) requestAnimationFrame(animate);
+        else {
+            selectedActionIndex = getActionUnderPointer();
+            statusContainer.style.display="flex";
+            spinButton.disabled=false;
+            highlightContainer.classList.add("pop");
+            setTimeout(()=>highlightContainer.classList.remove("pop"),200);
+        }
+    }
+    requestAnimationFrame(animate);
+}
+
+spinButton.addEventListener("click", spinWheel);
+
+doneButton.addEventListener("click",()=>{
+    if(selectedActionIndex!==null){
+        actions[selectedActionIndex].status="geschafft";
+        highlightContainer.textContent = `${actions[selectedActionIndex].text} (${actions[selectedActionIndex].points} P) [geschafft]`;
+        calculateTotalPoints();
+        statusContainer.style.display="none";
+    }
+});
+
+failedButton.addEventListener("click",()=>{
+    if(selectedActionIndex!==null){
+        actions[selectedActionIndex].status="fehlgeschlagen";
+        highlightContainer.textContent = `${actions[selectedActionIndex].text} (${actions[selectedActionIndex].points} P) [fehlgeschlagen]`;
+        calculateTotalPoints();
+        statusContainer.style.display="none";
+    }
+});
+
+editorButton.addEventListener("click",()=>{ renderEditor(); editorOverlay.style.display="flex"; });
+closeEditor.addEventListener("click",()=>{ editorOverlay.style.display="none"; });
+
+function renderEditor(){
+    editorContent.innerHTML="";
+    actions.forEach((a,index)=>{
+        const div=document.createElement("div");
+        div.className="editorItem";
+
+        const inputText=document.createElement("input");
+        inputText.type="text";
+        inputText.value=a.text;
+        inputText.addEventListener("input",()=>{ a.text=inputText.value; drawRoulette(); });
+
+        const deleteBtn=document.createElement("button");
+        deleteBtn.textContent="Löschen";
+        deleteBtn.addEventListener("click",()=>{
+            actions.splice(index,1);
+            renderEditor();
+            drawRoulette();
+        });
+
+        div.appendChild(inputText);
+        div.appendChild(deleteBtn);
+        editorContent.appendChild(div);
+    });
+}
+
+addActionBtn.addEventListener("click",()=>{
+    const text = prompt("Neue Handlung:");
+    const points = parseInt(prompt("Punkte für die Handlung:"),10);
+    if(text && !isNaN(points)){
+        actions.push({text, points, status:""});
+        renderEditor();
+        drawRoulette();
+    }
+});
+
+drawRoulette();
+</script>
+</body>
+</html>
